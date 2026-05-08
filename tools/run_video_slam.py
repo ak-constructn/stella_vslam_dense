@@ -45,6 +45,9 @@ def main():
     parser.add_argument("-i", "--map-db-in", default="", help="load a map from this path")
     parser.add_argument("-o", "--map-db-out", default="", help="store a map database at this path after slam")
     parser.add_argument("--eval-log-dir", default="", help="store trajectory and tracking times at this path (Specify the directory where it exists.)")
+    parser.add_argument("--auto-dump-on-loss", action="store_true",
+                        help="on tracking loss (after one failed relocalization), dump trajectories and reset the map; "
+                             "requires --eval-log-dir to be set")
 
     # Parse arguments
     args = parser.parse_args()
@@ -143,6 +146,15 @@ def main():
         slam.disable_loop_detection()
     if slam.dense_reconstruction_is_enabled() and args.disable_dense:
         slam.disable_dense_reconstruction()
+    if args.auto_dump_on_loss:
+        if not args.eval_log_dir:
+            parser.error("--auto-dump-on-loss requires --eval-log-dir to be set")
+        os.makedirs(args.eval_log_dir, exist_ok=True)
+        slam.enable_auto_dump_on_loss(
+            args.eval_log_dir + "/frame_trajectory",
+            args.eval_log_dir + "/keyframe_trajectory",
+            "TUM",
+        )
 
     paused = False
     stepping = False
@@ -428,10 +440,7 @@ def main():
     if args.kf_out:
         slam.save_keyframes(args.kf_out)
     if args.eval_log_dir:
-        try:
-            os.mkdir(args.eval_log_dir)
-        except FileExistsError:
-            pass
+        os.makedirs(args.eval_log_dir, exist_ok=True)
         slam.save_frame_trajectory(args.eval_log_dir + "/frame_trajectory.txt", "TUM")
         slam.save_keyframe_trajectory(args.eval_log_dir + "/keyframe_trajectory.txt", "TUM")
         with open(args.eval_log_dir + "/tracking_times.txt", "w") as f:

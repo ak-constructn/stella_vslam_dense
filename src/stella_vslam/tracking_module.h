@@ -140,6 +140,10 @@ public:
     //! latest tracking state
     tracker_state_t tracking_state_ = tracker_state_t::Initializing;
 
+    //! Set when tracking is lost within init_retry_threshold_time_ and the reset was deferred
+    //! so the caller (system) can save trajectories before the map is cleared.
+    bool early_init_loss_pending_ = false;
+
     //! current frame and its image
     data::frame curr_frm_;
 

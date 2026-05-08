@@ -602,6 +602,8 @@ std::shared_ptr<Mat44_t> system::feed_RGBD_frame(const cv::Mat& rgb_img, const c
 std::shared_ptr<Mat44_t> system::feed_frame(const data::frame& frm, const cv::Mat& img) {
     check_reset_request();
 
+    const auto prev_state = tracker_->tracking_state_;
+
     const auto start = std::chrono::system_clock::now();
 
     const auto cam_pose_wc = tracker_->feed_frame(frm);
@@ -619,7 +621,53 @@ std::shared_ptr<Mat44_t> system::feed_frame(const data::frame& frm, const cv::Ma
         map_publisher_->set_current_cam_pose(util::converter::inverse_pose(*cam_pose_wc));
     }
 
+    // Early-init loss: tracker lost tracking within init_retry_threshold_time_ and deferred
+    // the reset so we can save trajectories first. Reset is our responsibility.
+    if (tracker_->early_init_loss_pending_) {
+        tracker_->early_init_loss_pending_ = false;
+        if (auto_dump_on_loss_) {
+            const std::string idx = std::to_string(loss_segment_idx_++);
+            spdlog::info("early-init tracking loss, dumping segment {} and resetting map", idx);
+            if (!auto_dump_frame_prefix_.empty()) {
+                save_frame_trajectory(auto_dump_frame_prefix_ + "_" + idx + ".txt", auto_dump_format_);
+            }
+            if (!auto_dump_kf_prefix_.empty()) {
+                save_keyframe_trajectory(auto_dump_kf_prefix_ + "_" + idx + ".txt", auto_dump_format_);
+            }
+        }
+        request_reset();
+    }
+    // prev_state == Lost means relocalization was attempted this frame.
+    // If still Lost afterwards, reloc failed — dump trajectories and reset.
+    else if (auto_dump_on_loss_
+             && prev_state == tracker_state_t::Lost
+             && tracker_->tracking_state_ == tracker_state_t::Lost) {
+        const std::string idx = std::to_string(loss_segment_idx_++);
+        spdlog::info("relocalization failed, dumping segment {} and resetting map", idx);
+        if (!auto_dump_frame_prefix_.empty()) {
+            save_frame_trajectory(auto_dump_frame_prefix_ + "_" + idx + ".txt", auto_dump_format_);
+        }
+        if (!auto_dump_kf_prefix_.empty()) {
+            save_keyframe_trajectory(auto_dump_kf_prefix_ + "_" + idx + ".txt", auto_dump_format_);
+        }
+        request_reset();
+    }
+
     return cam_pose_wc;
+}
+
+void system::enable_auto_dump_on_loss(const std::string& frame_traj_prefix,
+                                      const std::string& keyframe_traj_prefix,
+                                      const std::string& format) {
+    auto_dump_frame_prefix_ = frame_traj_prefix;
+    auto_dump_kf_prefix_ = keyframe_traj_prefix;
+    auto_dump_format_ = format;
+    loss_segment_idx_ = 0;
+    auto_dump_on_loss_ = true;
+}
+
+void system::disable_auto_dump_on_loss() {
+    auto_dump_on_loss_ = false;
 }
 
 bool system::relocalize_by_pose(const Mat44_t& cam_pose_wc) {

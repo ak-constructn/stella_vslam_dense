@@ -117,6 +117,7 @@ void tracking_module::reset() {
     last_reloc_frm_id_ = 0;
     last_reloc_frm_timestamp_ = 0.0;
 
+    early_init_loss_pending_ = false;
     tracking_state_ = tracker_state_t::Initializing;
 }
 
@@ -159,7 +160,8 @@ std::shared_ptr<Mat44_t> tracking_module::feed_frame(data::frame curr_frm) {
         // if tracking is failed within init_retry_threshold_time_ sec after initialization, reset the system
         if (!mapper_->is_paused() && curr_frm_.timestamp_ - initializer_.get_initial_frame_timestamp() < init_retry_threshold_time_) {
             spdlog::info("tracking lost within {} sec after initialization", init_retry_threshold_time_);
-            reset();
+            // Defer the reset so the caller can save trajectories before the map is cleared.
+            early_init_loss_pending_ = true;
             return nullptr;
         }
     }

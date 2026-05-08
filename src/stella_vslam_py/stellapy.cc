@@ -217,6 +217,16 @@ public:
         py::gil_scoped_release release;
         system_->save_keyframe_trajectory(path, format);
     }
+    void enable_auto_dump_on_loss(const std::string& frame_prefix,
+                                   const std::string& kf_prefix,
+                                   const std::string& format) {
+        py::gil_scoped_release release;
+        system_->enable_auto_dump_on_loss(frame_prefix, kf_prefix, format);
+    }
+    void disable_auto_dump_on_loss() {
+        py::gil_scoped_release release;
+        system_->disable_auto_dump_on_loss();
+    }
 
     bool relocalize_by_pose(const PyPose& cam_pose_wc) {
         const auto cam_pose = tuple_to_homogeneous(cam_pose_wc);
@@ -527,6 +537,9 @@ PYBIND11_MODULE(stellapy, m) {
              py::arg("path"), py::arg("format"))
         .def("save_keyframe_trajectory", &stella_vslam::StellaVSLAM::save_keyframe_trajectory,
              py::arg("path"), py::arg("format"))
+        .def("enable_auto_dump_on_loss", &stella_vslam::StellaVSLAM::enable_auto_dump_on_loss,
+             py::arg("frame_traj_prefix"), py::arg("keyframe_traj_prefix"), py::arg("format"))
+        .def("disable_auto_dump_on_loss", &stella_vslam::StellaVSLAM::disable_auto_dump_on_loss)
 
         .def("relocalize_by_pose", &stella_vslam::StellaVSLAM::relocalize_by_pose, py::arg("cam_pose_wc"))
         .def("relocalize_by_pose_2d", &stella_vslam::StellaVSLAM::relocalize_by_pose_2d, py::arg("cam_pose_wc"), py::arg("normal_vector"))

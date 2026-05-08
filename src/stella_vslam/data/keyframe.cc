@@ -19,7 +19,7 @@ namespace stella_vslam {
 namespace data {
 
 keyframe::keyframe(unsigned int id, const frame& frm)
-    : id_(id), timestamp_(frm.timestamp_),
+    : id_(id), source_frame_id_(frm.id_), timestamp_(frm.timestamp_),
       camera_(frm.camera_), orb_params_(frm.orb_params_),
       frm_obs_(frm.frm_obs_), markers_2d_(frm.markers_2d_),
       bow_vec_(frm.bow_vec_), bow_feat_vec_(frm.bow_feat_vec_),
@@ -152,6 +152,13 @@ std::shared_ptr<keyframe> keyframe::from_stmt(sqlite3_stmt* stmt,
     }
     column_id++;
 
+    // src_frm_id is absent in older databases — default to 0 if the column is missing.
+    unsigned int source_frame_id = 0;
+    if (column_id < sqlite3_column_count(stmt)) {
+        source_frame_id = static_cast<unsigned int>(sqlite3_column_int64(stmt, column_id));
+    }
+    column_id++;
+
     auto bearings = eigen_alloc_vector<Vec3_t>();
     camera->convert_keypoints_to_bearings(undist_keypts, bearings);
     assert(bearings.size() == num_keypts);
@@ -169,6 +176,7 @@ std::shared_ptr<keyframe> keyframe::from_stmt(sqlite3_stmt* stmt,
     auto keyfrm = data::keyframe::make_keyframe(
         id + next_keyframe_id, timestamp, pose_cw, camera, orb_params,
         frm_obs, bow_vec, bow_feat_vec, image, depth, mask);
+    keyfrm->source_frame_id_ = source_frame_id;
     return keyfrm;
 }
 
@@ -300,6 +308,9 @@ bool keyframe::bind_to_stmt(sqlite3* db, sqlite3_stmt* stmt) const {
             cv::imencode(".png", mask_, mask);
         }
         ret = sqlite3_bind_blob(stmt, column_id++, mask.data(), mask.size(), SQLITE_TRANSIENT);
+    }
+    if (ret == SQLITE_OK) {
+        ret = sqlite3_bind_int64(stmt, column_id++, source_frame_id_);
     }
     if (ret != SQLITE_OK) {
         spdlog::error("SQLite error (bind): {}", sqlite3_errmsg(db));

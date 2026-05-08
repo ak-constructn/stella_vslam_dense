@@ -98,7 +98,8 @@ public:
             {"descs", "BLOB"},
             {"image", "BLOB"},
             {"depth", "BLOB"},
-            {"mask", "BLOB"}};
+            {"mask", "BLOB"},
+            {"src_frm_id", "INTEGER"}};
     };
     bool bind_to_stmt(sqlite3* db, sqlite3_stmt* stmt) const;
 
@@ -249,6 +250,9 @@ public:
 
     //! keyframe ID
     unsigned int id_;
+
+    //! ID of the source video frame this keyframe was promoted from (0 if loaded from map)
+    unsigned int source_frame_id_ = 0;
 
     //! timestamp in seconds
     const double timestamp_;

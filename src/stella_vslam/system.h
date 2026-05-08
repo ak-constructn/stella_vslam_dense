@@ -200,6 +200,16 @@ public:
     //! Reset of the system is requested or not
     bool reset_is_requested() const;
 
+    //! Enable auto-dump of trajectories and map reset on tracking loss.
+    //! Trajectories are saved as <prefix>_0.txt, <prefix>_1.txt, ... on each loss event,
+    //! after one failed relocalization attempt.
+    void enable_auto_dump_on_loss(const std::string& frame_traj_prefix,
+                                  const std::string& keyframe_traj_prefix,
+                                  const std::string& format);
+
+    //! Disable auto-dump and reset on tracking loss
+    void disable_auto_dump_on_loss();
+
     //-----------------------------------------
     // management for terminate
 
@@ -317,6 +327,13 @@ private:
 
     //! Temporary variables for visualization
     std::vector<cv::KeyPoint> keypts_;
+
+    //! auto-dump on loss state
+    std::atomic<bool> auto_dump_on_loss_{false};
+    std::string auto_dump_frame_prefix_;
+    std::string auto_dump_kf_prefix_;
+    std::string auto_dump_format_;
+    unsigned int loss_segment_idx_ = 0;
 };
 
 } // namespace stella_vslam
