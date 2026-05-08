@@ -27,6 +27,8 @@
 #include "stella_vslam/util/yaml.h"
 
 #include <thread>
+#include <filesystem>
+#include <chrono>
 
 #include <spdlog/spdlog.h>
 
@@ -626,14 +628,13 @@ std::shared_ptr<Mat44_t> system::feed_frame(const data::frame& frm, const cv::Ma
     if (tracker_->early_init_loss_pending_) {
         tracker_->early_init_loss_pending_ = false;
         if (auto_dump_on_loss_) {
-            const std::string idx = std::to_string(loss_segment_idx_++);
-            spdlog::info("early-init tracking loss, dumping segment {} and resetting map", idx);
-            if (!auto_dump_frame_prefix_.empty()) {
-                save_frame_trajectory(auto_dump_frame_prefix_ + "_" + idx + ".txt", auto_dump_format_);
-            }
-            if (!auto_dump_kf_prefix_.empty()) {
-                save_keyframe_trajectory(auto_dump_kf_prefix_ + "_" + idx + ".txt", auto_dump_format_);
-            }
+            const auto epoch_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+            const std::string seg_dir = auto_dump_base_dir_ + "/" + std::to_string(epoch_ms);
+            spdlog::info("early-init tracking loss, dumping segment to {}", seg_dir);
+            std::filesystem::create_directories(seg_dir);
+            save_frame_trajectory(seg_dir + "/frame_trajectory.txt", auto_dump_format_);
+            save_keyframe_trajectory(seg_dir + "/keyframe_trajectory.txt", auto_dump_format_);
         }
         request_reset();
     }
@@ -642,27 +643,22 @@ std::shared_ptr<Mat44_t> system::feed_frame(const data::frame& frm, const cv::Ma
     else if (auto_dump_on_loss_
              && prev_state == tracker_state_t::Lost
              && tracker_->tracking_state_ == tracker_state_t::Lost) {
-        const std::string idx = std::to_string(loss_segment_idx_++);
-        spdlog::info("relocalization failed, dumping segment {} and resetting map", idx);
-        if (!auto_dump_frame_prefix_.empty()) {
-            save_frame_trajectory(auto_dump_frame_prefix_ + "_" + idx + ".txt", auto_dump_format_);
-        }
-        if (!auto_dump_kf_prefix_.empty()) {
-            save_keyframe_trajectory(auto_dump_kf_prefix_ + "_" + idx + ".txt", auto_dump_format_);
-        }
+        const auto epoch_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        const std::string seg_dir = auto_dump_base_dir_ + "/" + std::to_string(epoch_ms);
+        spdlog::info("relocalization failed, dumping segment to {}", seg_dir);
+        std::filesystem::create_directories(seg_dir);
+        save_frame_trajectory(seg_dir + "/frame_trajectory.txt", auto_dump_format_);
+        save_keyframe_trajectory(seg_dir + "/keyframe_trajectory.txt", auto_dump_format_);
         request_reset();
     }
 
     return cam_pose_wc;
 }
 
-void system::enable_auto_dump_on_loss(const std::string& frame_traj_prefix,
-                                      const std::string& keyframe_traj_prefix,
-                                      const std::string& format) {
-    auto_dump_frame_prefix_ = frame_traj_prefix;
-    auto_dump_kf_prefix_ = keyframe_traj_prefix;
+void system::enable_auto_dump_on_loss(const std::string& base_dir, const std::string& format) {
+    auto_dump_base_dir_ = base_dir;
     auto_dump_format_ = format;
-    loss_segment_idx_ = 0;
     auto_dump_on_loss_ = true;
 }
 

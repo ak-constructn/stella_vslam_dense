@@ -150,11 +150,7 @@ def main():
         if not args.eval_log_dir:
             parser.error("--auto-dump-on-loss requires --eval-log-dir to be set")
         os.makedirs(args.eval_log_dir, exist_ok=True)
-        slam.enable_auto_dump_on_loss(
-            args.eval_log_dir + "/frame_trajectory",
-            args.eval_log_dir + "/keyframe_trajectory",
-            "TUM",
-        )
+        slam.enable_auto_dump_on_loss(args.eval_log_dir, "TUM")
 
     paused = False
     stepping = False
