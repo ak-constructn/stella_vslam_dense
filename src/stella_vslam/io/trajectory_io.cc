@@ -62,9 +62,16 @@ void trajectory_io::save_frame_trajectory(const std::string& path, const std::st
         const auto frm_id = rk_itr->first;
 
         // check if the frame was lost or not
-        if (is_lost_frms.at(frm_id)) {
-            spdlog::warn("frame {} was lost", frm_id);
-            continue;
+        {
+            auto it = is_lost_frms.find(frm_id);
+            if (it == is_lost_frms.end()) {
+                spdlog::warn("frame {} missing from lost-frame record, skipping", frm_id);
+                continue;
+            }
+            if (it->second) {
+                spdlog::warn("frame {} was lost", frm_id);
+                continue;
+            }
         }
 
         // check if the frame was skipped or not
@@ -88,12 +95,17 @@ void trajectory_io::save_frame_trajectory(const std::string& path, const std::st
                 << cam_pose_wc(2, 0) << " " << cam_pose_wc(2, 1) << " " << cam_pose_wc(2, 2) << " " << cam_pose_wc(2, 3) << std::endl;
         }
         else if (format == "TUM") {
+            auto ts_it = timestamps.find(frm_id);
+            if (ts_it == timestamps.end()) {
+                spdlog::warn("frame {} missing timestamp, skipping", frm_id);
+                continue;
+            }
             const Mat33_t& rot_wc = cam_pose_wc.block<3, 3>(0, 0);
             const Vec3_t& trans_wc = cam_pose_wc.block<3, 1>(0, 3);
             const Quat_t quat_wc = Quat_t(rot_wc);
             ofs << frm_id << " "
                 << std::setprecision(15)
-                << timestamps.at(frm_id) << " "
+                << ts_it->second << " "
                 << std::setprecision(9)
                 << trans_wc(0) << " " << trans_wc(1) << " " << trans_wc(2) << " "
                 << quat_wc.x() << " " << quat_wc.y() << " " << quat_wc.z() << " " << quat_wc.w() << std::endl;
